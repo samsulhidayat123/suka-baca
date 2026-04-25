@@ -176,8 +176,8 @@
 
 <script>
     // 🔐 AMBIL DARI CONFIG
-    var CONFIG_URL = window.ENV.SUPABASE_URL;
-    var CONFIG_KEY = window.ENV.SUPABASE_KEY;
+    var CONFIG_URL = window.ENV?.SUPABASE_URL || "https://gonlvyxvmjgowvnpzljl.supabase.co";
+    var CONFIG_KEY = window.ENV?.SUPABASE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdvbmx2eXh2bWpnb3d2bnB6bGpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5NDk2MDIsImV4cCI6MjA5MjUyNTYwMn0.HpnxbdJhNMdQNlXCD_tz-gvojTGMtg8rucQKpAUuSSw";   
 
     var supabase = window.supabase.createClient(CONFIG_URL, CONFIG_KEY);
     var currentManga = "";
