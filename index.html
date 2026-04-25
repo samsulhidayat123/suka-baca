@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SUKA BACA Manga - Premium</title>
+    <link rel="icon" type="image/png" href="logok.png">
+    
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-main: #141414;
+            --bg-nav: rgba(0, 0, 0, 0.95);
+            --accent: #E50914;
+            --text-main: #ffffff;
+            --text-muted: #b3b3b3;
+        }
+
+        body {
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            font-family: 'Poppins', sans-serif;
+            margin: 0; padding: 0;
+            scroll-behavior: smooth;
+        }
+
+        /* --- NAVBAR --- */
+        .navbar {
+            background-color: var(--bg-nav);
+            backdrop-filter: blur(20px);
+            padding: 10px 5%;
+            width: 100%;
+            position: fixed; top: 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            z-index: 1000;
+            display: flex; justify-content: space-between; align-items: center;
+            box-sizing: border-box;
+        }
+
+        .brand { font-weight: 800; font-size: 26px; color: var(--accent); margin: 0; cursor: pointer; }
+        .brand span { color: white; }
+
+        /* --- VIEWS --- */
+        .view { display: none; padding-top: 80px; width: 100%; box-sizing: border-box; }
+        .view.active { display: block; }
+
+        /* --- HOME VIEW (Banner & Grid) --- */
+        .hero {
+            height: 50vh; width: 100%;
+            background: linear-gradient(to top, var(--bg-main), transparent), url('https://images.alphacoders.com/605/605592.png');
+            background-size: cover; background-position: center;
+            display: flex; align-items: center; padding: 0 5%; box-sizing: border-box;
+        }
+
+        .container { padding: 40px 5%; }
+        .manga-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 25px;
+        }
+
+        .manga-card {
+            background-color: #1f1f1f;
+            border-radius: 8px; overflow: hidden;
+            cursor: pointer; transition: 0.3s;
+            border: 1px solid #333;
+        }
+        .manga-card:hover { transform: scale(1.05); border-color: var(--accent); }
+        .manga-card img { width: 100%; height: 240px; object-fit: cover; }
+        .manga-card-info { padding: 12px; font-size: 13px; font-weight: 600; text-align: center; }
+
+        /* --- CHAPTER SELECTION VIEW --- */
+        .detail-header { text-align: center; margin-bottom: 40px; }
+        .detail-header h1 { font-size: 32px; color: var(--accent); margin-bottom: 5px; }
+        
+        .chapter-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            gap: 15px;
+            max-width: 900px; margin: 0 auto;
+        }
+
+        .btn-chapter {
+            background: #222;
+            color: white;
+            border: 1px solid #444;
+            padding: 15px;
+            border-radius: 6px;
+            text-align: center;
+            cursor: pointer;
+            font-weight: 600;
+            transition: 0.3s;
+        }
+        .btn-chapter:hover {
+            background: var(--accent);
+            border-color: var(--accent);
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(229, 9, 20, 0.4);
+        }
+
+        /* --- READER VIEW --- */
+        #reader-area { width: 100%; max-width: 800px; margin: 0 auto; background: #000; }
+        .lazy-img { width: 100%; height: auto; display: block; opacity: 0; transition: 0.8s; margin-bottom: -1px; }
+        .lazy-img.loaded { opacity: 1; }
+
+        .reader-footer { text-align: center; padding: 60px 20px; display: flex; flex-direction: column; gap: 15px; align-items: center; }
+
+        .btn-nav-back {
+            background: transparent; color: white; border: 1px solid #555; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: 600;
+        }
+        .btn-nav-back:hover { background: white; color: black; }
+
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        .loading { padding: 50px; text-align: center; color: var(--text-muted); }
+    </style>
+</head>
+<body>
+
+    <nav class="navbar">
+        <h1 class="brand" onclick="showHome()">SUKA<span>BACA</span></h1>
+        <div id="nav-actions" style="display: none;">
+            <button class="btn-nav-back" onclick="showHome()">KEMBALI KE BERANDA</button>
+        </div>
+    </nav>
+
+    <div id="view-home" class="view active">
+        <header class="hero">
+            <div class="hero-content">
+                <h1 style="font-size: 40px; margin: 0;">Manga Collection</h1>
+                <p style="color: var(--text-muted); max-width: 500px;">Streaming manga tercepat dengan kualitas mantap.</p>
+            </div>
+        </header>
+        <div class="container">
+            <h2 style="font-size: 20px; margin-bottom: 20px;">Paling Populer</h2>
+            <div id="manga-list" class="manga-grid">
+                <div class="loading">Menghubungkan ke VOID...</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="view-detail" class="view">
+        <div class="container">
+            <div class="detail-header">
+                <h1 id="detail-title">Judul Manga</h1>
+                <p style="color: var(--text-muted);">Pilih Episode untuk mulai membaca</p>
+            </div>
+            <div id="chapter-list" class="chapter-grid"></div>
+        </div>
+    </div>
+
+    <div id="view-reader" class="view">
+        <div id="reader-area"></div>
+        <div class="reader-footer">
+            <button class="btn-chapter" style="width: 250px; background: var(--accent);" onclick="window.scrollTo({top:0, behavior:'smooth'})">KE ATAS ⬆</button>
+            <button class="btn-chapter" style="width: 250px;" onclick="backToDetail()">PILIH CHAPTER LAIN </button>
+            <button class="btn-chapter" style="width: 250px; background: #333;" onclick="showHome()">BERANDA </button>
+        </div>
+    </div>
+
+    <script>
+        var CONFIG_URL = 'https://gonlvyxvmjgowvnpzljl.supabase.co';
+        var CONFIG_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdvbmx2eXh2bWpnb3d2bnB6bGpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5NDk2MDIsImV4cCI6MjA5MjUyNTYwMn0.HpnxbdJhNMdQNlXCD_tz-gvojTGMtg8rucQKpAUuSSw';
+        
+        var supabase = window.supabase.createClient(CONFIG_URL, CONFIG_KEY);
+        var currentManga = "";
+
+        const observer = new IntersectionObserver((entries, obs) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const img = entry.target;
+                    img.src = img.getAttribute('data-src');
+                    img.onload = () => img.classList.add('loaded');
+                    obs.unobserve(img);
+                }
+            });
+        }, { rootMargin: "0px 0px 1500px 0px" });
+
+        // LOAD SEMUA JUDUL KE BERANDA
+        async function loadHome() {
+            const { data, error } = await supabase.from('manga_chapters').select('judul, daftar_gambar');
+            if (error) return;
+
+            const judulUnik = [...new Set(data.map(item => item.judul))];
+            const listContainer = document.getElementById('manga-list');
+            listContainer.innerHTML = '';
+
+            judulUnik.forEach(judul => {
+                const mangaData = data.find(item => item.judul === judul);
+                let firstImage = "https://via.placeholder.com/200x300/222/ffffff?text=No+Cover";
+                
+                if (mangaData && mangaData.daftar_gambar) {
+                    let imgs = mangaData.daftar_gambar;
+                    if (typeof imgs === 'string') imgs = JSON.parse(imgs);
+                    if (imgs.length > 0) firstImage = imgs[0];
+                }
+
+                const card = document.createElement('div');
+                card.className = 'manga-card';
+                card.innerHTML = `
+                    <img src="${firstImage}">
+                    <div class="manga-card-info">${judul}</div>
+                `;
+                card.onclick = () => showDetail(judul);
+                listContainer.appendChild(card);
+            });
+        }
+
+        // TAMPILKAN DAFTAR CHAPTER (DETAIL VIEW)
+        async function showDetail(judul) {
+            currentManga = judul;
+            switchView('view-detail');
+            document.getElementById('detail-title').innerText = judul;
+            const chapterList = document.getElementById('chapter-list');
+            chapterList.innerHTML = '<div class="loading">Mengambil episode...</div>';
+
+            const { data, error } = await supabase.from('manga_chapters')
+                .select('chapter')
+                .eq('judul', judul)
+                .order('chapter', { ascending: false });
+
+            if (error) return;
+
+            chapterList.innerHTML = '';
+            data.forEach(row => {
+                const btn = document.createElement('div');
+                btn.className = 'btn-chapter';
+                btn.innerText = `Ch. ${row.chapter}`;
+                btn.onclick = () => startReading(row.chapter);
+                chapterList.appendChild(btn);
+            });
+        }
+
+        // MULAI BACA (READER VIEW)
+        async function startReading(ch) {
+            switchView('view-reader');
+            const area = document.getElementById('reader-area');
+            area.innerHTML = '<div class="loading">Membuka Gulungan Kitab...</div>';
+            
+            const { data, error } = await supabase.from('manga_chapters')
+                .select('daftar_gambar')
+                .eq('judul', currentManga)
+                .eq('chapter', ch)
+                .single();
+
+            if (error || !data) return;
+
+            area.innerHTML = '';
+            let images = data.daftar_gambar;
+            if (typeof images === 'string') images = JSON.parse(images);
+
+            images.forEach(link => {
+                const img = document.createElement('img');
+                img.className = 'lazy-img';
+                img.setAttribute('data-src', link);
+                area.appendChild(img);
+                observer.observe(img);
+            });
+        }
+
+        // LOGIKA PINDAH HALAMAN
+        function switchView(viewId) {
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            document.getElementById(viewId).classList.add('active');
+            document.getElementById('nav-actions').style.display = (viewId === 'view-home') ? 'none' : 'block';
+            window.scrollTo(0,0);
+        }
+
+        function showHome() { switchView('view-home'); document.getElementById('reader-area').innerHTML = ''; }
+        function backToDetail() { switchView('view-detail'); }
+
+        loadHome();
+    </script>
+</body>
+</html>
