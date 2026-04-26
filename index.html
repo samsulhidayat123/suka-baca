@@ -7,22 +7,16 @@
 
     <link rel="icon" type="image/png" href="logok.png">
 
-    <!-- 🔐 CSP (optional security) -->
     <meta http-equiv="Content-Security-Policy" content="
-    default-src 'self' https://cdn.jsdelivr.net https://*.supabase.co https://images.alphacoders.com;
+    default-src 'self' https://cdn.jsdelivr.net https://*.supabase.co https://images.alphacoders.com https://via.placeholder.com;
     img-src * data:;
     script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net;
     style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
     font-src https://fonts.gstatic.com;
     ">
 
-    <!-- SUPABASE -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-    <!-- CONFIG (KEY DI LUAR) -->
     <script src="config.js"></script>
-
-    <!-- FONT -->
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&display=swap" rel="stylesheet">
 
     <style>
@@ -33,6 +27,18 @@
             --text-main: #ffffff;
             --text-muted: #b3b3b3;
         }
+
+        /* LIGHT MODE THEME */
+        body.light-mode {
+            --bg-main: #f4f4f4;
+            --bg-nav: rgba(255, 255, 255, 0.95);
+            --text-main: #141414;
+            --text-muted: #555;
+        }
+        body.light-mode .manga-card { background: #fff; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        body.light-mode .search-bar { background: #ddd; color: #141414; }
+        body.light-mode #reader-area { background: #fff; }
+        body.light-mode .btn-chapter { background: #ddd; color: #141414; }
 
         body {
             background-color: var(--bg-main);
@@ -47,30 +53,65 @@
             backdrop-filter: blur(20px);
             padding: 10px 5%;
             position: fixed;
-            width: 100%;
+            width: 90%;
             top: 0;
             display: flex;
             justify-content: space-between;
+            align-items: center;
             z-index: 1000;
+            transition: top 0.3s ease-in-out;
         }
 
-        .brand { font-weight: 800; font-size: 26px; color: var(--accent); cursor: pointer; }
+        .brand { font-weight: 800; font-size: 26px; color: var(--accent); cursor: pointer; margin: 0; }
         .brand span { color: white; }
+        body.light-mode .brand span { color: #141414; }
+
+        .nav-right { display: flex; gap: 10px; align-items: center; }
+        .theme-toggle { background: none; border: none; font-size: 20px; cursor: pointer; }
+        .btn-auth { background: var(--accent); color: white; padding: 6px 15px; border-radius: 20px; border: none; cursor: pointer; font-weight: 600; font-family: inherit; }
+        .btn-auth:hover { opacity: 0.8; }
+
+        .search-bar {
+            padding: 8px 15px;
+            border-radius: 20px;
+            border: none;
+            outline: none;
+            background: #333;
+            color: white;
+            font-family: inherit;
+        }
+
+        /* READING PROGRESS BAR */
+        #read-progress {
+            position: fixed; top: 0; left: 0;
+            height: 3px; background: var(--accent);
+            width: 0%; z-index: 1001;
+            transition: width 0.1s; display: none;
+        }
 
         .view { display: none; padding-top: 80px; }
         .view.active { display: block; }
 
         .hero {
-            height: 50vh;
+            height: 40vh;
             background: linear-gradient(to top, var(--bg-main), transparent),
             url('https://images.alphacoders.com/605/605592.png');
             background-size: cover;
+            background-position: center;
             display: flex;
-            align-items: center;
-            padding: 0 5%;
+            align-items: flex-end;
+            padding: 0 5% 40px 5%;
         }
 
         .container { padding: 40px 5%; }
+
+        /* HISTORY BANNER */
+        .history-banner { background: linear-gradient(45deg, var(--accent), #8b0000); padding: 15px 20px; border-radius: 8px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; transition: transform 0.3s; }
+        .history-banner:hover { transform: scale(1.02); }
+        .history-banner:active { transform: scale(0.98); }
+        .history-info h3 { margin: 0 0 5px 0; font-size: 18px; }
+        .history-info p { margin: 0; font-size: 14px; opacity: 0.9; }
+        .play-icon { font-size: 24px; }
 
         .manga-grid {
             display: grid;
@@ -104,6 +145,7 @@
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
             gap: 15px;
+            margin-top: 20px;
         }
 
         .btn-chapter {
@@ -111,67 +153,230 @@
             padding: 15px;
             text-align: center;
             cursor: pointer;
+            border-radius: 4px;
+            transition: 0.2s;
         }
 
-        .btn-chapter:hover {
-            background: var(--accent);
-        }
+        .btn-chapter:hover { background: var(--accent); }
 
         #reader-area { max-width: 800px; margin: auto; background: #000; }
+        #reader-area img { width: 100%; height: auto; display: block; margin-bottom: -1px; }
 
-        /* LAZY LOAD */
-        .lazy-img {
-            opacity: 0;
-            transition: 0.6s;
+        .reader-nav {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            max-width: 800px;
+            flex-wrap: wrap;
+            margin: 0 auto 15px auto;
         }
 
-        .lazy-img.loaded {
-            opacity: 1;
-        }
-
-        .loading {
-            padding: 50px;
+        .btn {
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            cursor: pointer;
+            border-radius: 4px;
+            font-weight: bold;
+            flex: 1;
             text-align: center;
-            color: var(--text-muted);
+        }
+
+        .chapter-dropdown { flex: 1; padding: 10px; border-radius: 4px; background: #333; color: white; border: none; font-size: 14px; font-family: inherit; cursor: pointer; }
+        body.light-mode .chapter-dropdown { background: #ddd; color: black; }
+        .chapter-dropdown:focus { outline: none; }
+
+        .btn:disabled {
+            background: #555;
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        @media (max-width: 600px) {
+            .btn, .chapter-dropdown { flex: 1 1 45%; box-sizing: border-box; }
+        }
+
+        /* SAWERIA & KOMENTAR */
+        .support-section { max-width: 800px; margin: 30px auto; text-align: center; padding: 30px 15px; border-top: 1px solid #333; }
+        body.light-mode .support-section { border-top: 1px solid #ddd; }
+
+        .btn-saweria { background: #ff9800; color: #fff; text-decoration: none; padding: 12px 25px; border-radius: 25px; font-weight: bold; display: inline-block; margin-top: 10px; transition: 0.3s; box-shadow: 0 4px 15px rgba(255, 152, 0, 0.4); animation: pulseSaweria 2s infinite; }
+        .btn-saweria:hover { background: #e68a00; transform: translateY(-3px) scale(1.05); box-shadow: 0 6px 20px rgba(255, 152, 0, 0.6); animation: none; }
+        @keyframes pulseSaweria { 0% { transform: scale(1); } 50% { transform: scale(1.03); } 100% { transform: scale(1); } }
+
+        .comment-section { max-width: 800px; margin: 0 auto 50px auto; padding: 20px; background: #1f1f1f; border-radius: 8px; }
+        body.light-mode .comment-section { background: #fff; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .comment-item { border-bottom: 1px solid #333; padding: 15px 0; }
+        body.light-mode .comment-item { border-bottom: 1px solid #ddd; }
+        .comment-item:last-child { border-bottom: none; }
+        .comment-user { font-weight: bold; color: var(--accent); font-size: 14px; display: flex; justify-content: space-between;}
+        .comment-date { font-size: 11px; color: var(--text-muted); font-weight: normal; }
+        .comment-text { margin-top: 8px; font-size: 14px; line-height: 1.5; }
+        
+        .comment-form { display: flex; flex-direction: column; gap: 10px; margin-top: 15px; }
+        .comment-input { padding: 12px; border-radius: 4px; background: #333; color: white; border: none; resize: vertical; font-family: inherit;}
+        body.light-mode .comment-input { background: #eee; color: black; }
+        .comment-input:focus { outline: 1px solid var(--accent); }
+        .login-prompt { text-align: center; padding: 20px; background: #222; border-radius: 8px; margin-top: 20px; }
+        body.light-mode .login-prompt { background: #eee; }
+
+        .lazy-img { opacity: 0; transition: 0.6s; }
+        .lazy-img.loaded { opacity: 1; }
+
+        .loading { padding: 50px; text-align: center; color: var(--text-muted); font-size: 1.2rem; }
+        
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            width: 40px; height: 40px; border-radius: 50%;
+            border-left-color: var(--accent);
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px auto;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        .error-msg { color: #E50914; text-align: center; padding: 20px; }
+
+        /* SCROLL TO TOP BUTTON */
+        #scrollTopBtn {
+            display: none;
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            z-index: 99;
+            border: none;
+            outline: none;
+            background-color: var(--accent);
+            color: white;
+            cursor: pointer;
+            padding: 15px;
+            border-radius: 50%;
+            font-size: 18px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        #scrollTopBtn:hover { background-color: #b80710; }
+
+        /* MODAL AUTH (LOGIN & REGISTER) */
+        .modal { 
+            display: none; position: fixed; z-index: 2000; left: 0; top: 0; 
+            width: 100%; height: 100%; background-color: rgba(0,0,0,0.7); 
+            backdrop-filter: blur(5px);
+        }
+        .modal-content { 
+            background-color: #1f1f1f; margin: 10% auto; padding: 25px; 
+            border-radius: 8px; width: 90%; max-width: 400px; 
+            position: relative; box-shadow: 0 4px 15px rgba(0,0,0,0.5); 
+        }
+        body.light-mode .modal-content { background-color: #fff; }
+        .close-btn { 
+            position: absolute; right: 20px; top: 15px; font-size: 28px; 
+            cursor: pointer; color: var(--text-muted); line-height: 1;
+        }
+        .close-btn:hover { color: var(--accent); }
+        .modal-tabs { 
+            display: flex; border-bottom: 2px solid #333; margin-top: 10px; margin-bottom: 25px; 
+        }
+        body.light-mode .modal-tabs { border-bottom: 2px solid #ddd; }
+        .tab-btn { 
+            flex: 1; background: none; border: none; color: var(--text-muted); 
+            padding: 10px; font-size: 16px; cursor: pointer; font-weight: bold; transition: 0.3s; 
+        }
+        .tab-btn.active { color: var(--accent); border-bottom: 2px solid var(--accent); }
+        .form-input { 
+            width: 100%; padding: 12px; margin-bottom: 15px; border-radius: 4px; 
+            border: 1px solid #333; background: #333; color: white; font-family: inherit; box-sizing: border-box; 
+        }
+        body.light-mode .form-input { background: #eee; border: 1px solid #ddd; color: black; }
+        .form-input:focus { outline: 1px solid var(--accent); border-color: var(--accent); }
+        .btn-full { width: 100%; padding: 12px; font-size: 16px; }
+        .auth-error { 
+            color: var(--accent); text-align: center; margin-top: 15px; 
+            font-size: 14px; min-height: 20px; 
+        }
+        .auth-success {
+            color: #4CAF50; text-align: center; margin-top: 15px; 
+            font-size: 14px; min-height: 20px;
         }
     </style>
 </head>
 
 <body>
 
+<div id="read-progress"></div>
+
 <nav class="navbar">
     <h1 class="brand" onclick="showHome()">SUKA<span>BACA</span></h1>
-    <div id="nav-actions" style="display:none;">
-        <button onclick="showHome()">BERANDA</button>
+    <div class="nav-right">
+        <input type="text" id="searchInput" class="search-bar" placeholder="Cari manga..." onkeyup="filterManga()">
+        <button class="theme-toggle" onclick="toggleTheme()" title="Ganti Tema">🌙</button>
+        <button id="btnAuth" class="btn-auth" onclick="handleAuth()">Login</button>
     </div>
 </nav>
 
-<!-- HOME -->
 <div id="view-home" class="view active">
     <header class="hero">
         <div>
-            <h1>Manga Collection</h1>
+            <h1>Koleksi Manga Terbaru</h1>
         </div>
     </header>
 
     <div class="container">
+        <div id="history-container"></div>
         <div id="manga-list" class="manga-grid">
-            <div class="loading">Loading...</div>
+            <div class="loading">Memuat daftar manga...</div>
         </div>
     </div>
 </div>
 
-<!-- DETAIL -->
 <div id="view-detail" class="view">
     <div class="container">
         <h1 id="detail-title"></h1>
+        <button class="btn" style="max-width: 200px;" onclick="showHome()">🔙 Kembali</button>
         <div id="chapter-list" class="chapter-grid"></div>
     </div>
 </div>
 
-<!-- READER -->
 <div id="view-reader" class="view">
+    <div class="container reader-nav" id="top-reader-nav">
+        </div>
+    
     <div id="reader-area"></div>
+
+    <div class="container reader-nav" id="bottom-reader-nav">
+        </div>
+
+    <div class="support-section">
+        <h3>Suka dengan manga ini?</h3>
+        <p>Dukung kami agar tetap semangat update dan bebas iklan!</p>
+        
+        <img src="qr-saweria.png" alt="Scan QR untuk Donasi" style="max-width: 200px; border-radius: 8px; margin: 15px auto; display: block; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">
+        
+        <a href="https://saweria.co/NAMA_KAMU_DISINI" target="_blank" class="btn-saweria">☕ Traktir Kopi di Saweria</a>
+    </div>
+
+    <div class="comment-section" id="comment-section">
+        <h3>💬 Komentar (<span id="comment-count">0</span>)</h3>
+        <div id="comment-list">
+            <div class="loading">Memuat komentar...</div>
+        </div>
+        <div id="comment-action"></div>
+    </div>
+</div>
+
+<button onclick="scrollToTop()" id="scrollTopBtn" title="Ke Atas">⬆</button>
+
+<div id="authModal" class="modal">
+    <div class="modal-content">
+        <span class="close-btn" onclick="closeAuthModal()">&times;</span>
+        <div class="modal-tabs">
+            <button id="tabLogin" class="tab-btn active" onclick="switchAuthTab('login')">Login</button>
+            <button id="tabRegister" class="tab-btn" onclick="switchAuthTab('register')">Daftar</button>
+        </div>
+        <input type="email" id="authEmail" class="form-input" placeholder="Alamat Email" required>
+        <input type="password" id="authPassword" class="form-input" placeholder="Password" required>
+        <button id="btnSubmitAuth" class="btn btn-full" onclick="submitAuth()">Masuk</button>
+        <div id="authMessage" class="auth-error"></div>
+    </div>
 </div>
 
 <script>
@@ -180,7 +385,113 @@
     var CONFIG_KEY = window.ENV?.SUPABASE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdvbmx2eXh2bWpnb3d2bnB6bGpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5NDk2MDIsImV4cCI6MjA5MjUyNTYwMn0.HpnxbdJhNMdQNlXCD_tz-gvojTGMtg8rucQKpAUuSSw";   
 
     var supabase = window.supabase.createClient(CONFIG_URL, CONFIG_KEY);
+    
+    // Variabel Global
     var currentManga = "";
+    var availableChapters = []; 
+    var allMangaData = []; // Untuk fitur search
+    var currentReadingChapter = null; // Menyimpan chapter yang sedang dibaca
+    var currentUser = null; // Data user yang login
+
+    // INISIALISASI TEMA
+    if (localStorage.getItem('sukabaca_theme') === 'light') {
+        document.body.classList.add('light-mode');
+        document.querySelector('.theme-toggle').innerText = '☀️';
+    }
+
+    function toggleTheme() {
+        document.body.classList.toggle('light-mode');
+        const isLight = document.body.classList.contains('light-mode');
+        localStorage.setItem('sukabaca_theme', isLight ? 'light' : 'dark');
+        document.querySelector('.theme-toggle').innerText = isLight ? '☀️' : '🌙';
+    }
+
+    // SISTEM OTENTIKASI USER (SUPABASE AUTH)
+    async function checkUser() {
+        const { data: { session } } = await supabase.auth.getSession();
+        currentUser = session?.user || null;
+        updateAuthUI();
+
+        supabase.auth.onAuthStateChange((_event, session) => {
+            currentUser = session?.user || null;
+            updateAuthUI();
+            if (document.getElementById('view-reader').classList.contains('active')) {
+                renderCommentForm();
+            }
+        });
+    }
+
+    function updateAuthUI() {
+        const btnAuth = document.getElementById('btnAuth');
+        btnAuth.innerText = currentUser ? "Logout" : "Login";
+    }
+
+    async function handleAuth() {
+        if (currentUser) {
+            await supabase.auth.signOut();
+        } else {
+            openAuthModal();
+        }
+    }
+
+    // LOGIKA MODAL AUTH
+    let authMode = 'login';
+
+    function openAuthModal() {
+        document.getElementById('authModal').style.display = 'block';
+        document.getElementById('authEmail').value = '';
+        document.getElementById('authPassword').value = '';
+        document.getElementById('authMessage').innerText = '';
+        switchAuthTab('login');
+    }
+
+    function closeAuthModal() {
+        document.getElementById('authModal').style.display = 'none';
+    }
+
+    function switchAuthTab(mode) {
+        authMode = mode;
+        document.getElementById('tabLogin').classList.toggle('active', mode === 'login');
+        document.getElementById('tabRegister').classList.toggle('active', mode === 'register');
+        document.getElementById('btnSubmitAuth').innerText = mode === 'login' ? 'Masuk' : 'Daftar Sekarang';
+        document.getElementById('authMessage').innerText = '';
+        document.getElementById('authMessage').className = 'auth-error';
+    }
+
+    async function submitAuth() {
+        const email = document.getElementById('authEmail').value.trim();
+        const password = document.getElementById('authPassword').value.trim();
+        const msgDiv = document.getElementById('authMessage');
+        
+        if (!email || !password) {
+            msgDiv.innerText = "Email dan password wajib diisi!";
+            msgDiv.className = 'auth-error';
+            return;
+        }
+
+        msgDiv.innerText = "Memproses...";
+        msgDiv.className = 'auth-error'; // Pakai warna biasa dulu saat loading
+
+        let result;
+        if (authMode === 'login') {
+            result = await supabase.auth.signInWithPassword({ email, password });
+        } else {
+            result = await supabase.auth.signUp({ email, password });
+        }
+            
+        if (result.error) {
+            msgDiv.innerText = result.error.message;
+            msgDiv.className = 'auth-error';
+        } else {
+            // Jika register dengan konfirmasi email (Supabase default)
+            if (authMode === 'register' && !result.data.session) {
+                msgDiv.innerText = "Pendaftaran berhasil! Cek email kamu untuk verifikasi.";
+                msgDiv.className = 'auth-success';
+            } else {
+                closeAuthModal(); // Tutup kalau berhasil login / auto-login setelah register
+            }
+        }
+    }
 
     /* LAZY LOAD */
     const observer = new IntersectionObserver((entries, obs) => {
@@ -192,101 +503,349 @@
                 obs.unobserve(img);
             }
         });
-    }, { rootMargin: "0px 0px 1000px 0px" });
+    }, { rootMargin: "0px 0px 800px 0px" });
+
+    // SCROLL TO TOP & SMART NAVBAR LOGIC
+    let lastScrollTop = 0;
+    window.onscroll = function() {
+        let winScroll = document.body.scrollTop || document.documentElement.scrollTop;
+        
+        // Smart Navbar (Sembunyikan saat scroll ke bawah)
+        let navbar = document.querySelector('.navbar');
+        if (winScroll > lastScrollTop && winScroll > 80) {
+            navbar.style.top = "-80px";
+        } else {
+            navbar.style.top = "0";
+        }
+        lastScrollTop = winScroll;
+
+        if (winScroll > 300) {
+            document.getElementById("scrollTopBtn").style.display = "block";
+        } else {
+            document.getElementById("scrollTopBtn").style.display = "none";
+        }
+
+        // PROGRESS BAR BACA
+        if (document.getElementById('view-reader').classList.contains('active')) {
+            let height = document.documentElement.scrollHeight - document.documentElement.clientHeight;
+            let scrolled = (winScroll / height) * 100;
+            document.getElementById("read-progress").style.width = scrolled + "%";
+        }
+    };
+
+    function scrollToTop() {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // KEYBOARD NAVIGATION
+    document.addEventListener('keydown', (e) => {
+        if (document.getElementById('view-reader').classList.contains('active')) {
+            const currentIndex = availableChapters.indexOf(currentReadingChapter);
+            if (currentIndex !== -1) {
+                const chSebelumnya = availableChapters[currentIndex + 1];
+                const chSelanjutnya = availableChapters[currentIndex - 1];
+
+                if (e.key === 'ArrowLeft' && chSebelumnya) {
+                    startReading(chSebelumnya);
+                } else if (e.key === 'ArrowRight' && chSelanjutnya) {
+                    startReading(chSelanjutnya);
+                }
+            }
+        }
+    });
+
+    function loadHistory() {
+        const history = JSON.parse(localStorage.getItem('sukaBaca_history'));
+        const container = document.getElementById('history-container');
+        if (history && history.judul && history.chapter) {
+            container.innerHTML = `
+                <div class="history-banner" onclick="resumeReading('${history.judul}', '${history.chapter}')">
+                    <div class="history-info">
+                        <h3>Lanjutkan Membaca</h3>
+                        <p>${history.judul} - Chapter ${history.chapter}</p>
+                    </div>
+                    <div class="play-icon">
+                        <i class="fi fi-rr-play"></i></div>
+                </div>
+            `;
+        } else {
+            container.innerHTML = "";
+        }
+    }
+
+    async function resumeReading(judul, chapter) {
+        // Ambil list chapter dulu sebelum membaca agar tombol Next/Prev berfungsi
+        await showDetail(judul);
+        startReading(chapter);
+    }
 
     async function loadHome() {
-        const { data } = await supabase.from('manga_chapters').select('judul, daftar_gambar');
+        try {
+            document.getElementById('manga-list').innerHTML = "<div class='loading'><div class='spinner'></div>Memuat daftar manga...</div>";
+            loadHistory();
+            
+            const { data, error } = await supabase.from('manga_chapters').select('judul, daftar_gambar');
+            if (error) throw error;
 
+            // Ambil judul unik saja
+            const unique = [...new Set(data.map(x => x.judul))];
+            
+            allMangaData = unique.map(judul => {
+                const item = data.find(x => x.judul === judul);
+                let img = "https://via.placeholder.com/300x450?text=No+Cover";
+                if (item.daftar_gambar) {
+                    let imgs = item.daftar_gambar;
+                    if (typeof imgs === "string") {
+                        try { imgs = JSON.parse(imgs); } catch(e) {}
+                    }
+                    if(imgs && imgs.length > 0) img = imgs[0];
+                }
+                return { judul, img };
+            });
+
+            renderMangaList(allMangaData);
+        } catch (err) {
+            document.getElementById('manga-list').innerHTML = `<div class="error-msg">Gagal memuat data: ${err.message}</div>`;
+        }
+    }
+
+    function renderMangaList(mangaArray) {
         const container = document.getElementById('manga-list');
         container.innerHTML = "";
 
-        const unique = [...new Set(data.map(x => x.judul))];
+        if (mangaArray.length === 0) {
+            container.innerHTML = "<div class='loading'>Manga tidak ditemukan.</div>";
+            return;
+        }
 
-        unique.forEach(judul => {
-            const item = data.find(x => x.judul === judul);
-
-            let img = "";
-            if (item.daftar_gambar) {
-                let imgs = item.daftar_gambar;
-                if (typeof imgs === "string") imgs = JSON.parse(imgs);
-                img = imgs[0];
-            }
-
+        mangaArray.forEach(manga => {
             const el = document.createElement("div");
             el.className = "manga-card";
-
             el.innerHTML = `
-                <img class="lazy-img" data-src="${img}">
-                <div class="manga-card-info">${judul}</div>
+                <img class="lazy-img" data-src="${manga.img}" onerror="this.src='https://via.placeholder.com/300x450?text=Error'">
+                <div class="manga-card-info">${manga.judul}</div>
             `;
-
-            el.onclick = () => showDetail(judul);
-
+            el.onclick = () => showDetail(manga.judul);
             container.appendChild(el);
             observer.observe(el.querySelector("img"));
         });
     }
 
+    function filterManga() {
+        const query = document.getElementById('searchInput').value.toLowerCase();
+        const filtered = allMangaData.filter(m => m.judul.toLowerCase().includes(query));
+        renderMangaList(filtered);
+    }
+
     async function showDetail(judul) {
         currentManga = judul;
         switchView('view-detail');
-
         document.getElementById('detail-title').innerText = judul;
-
-        const { data } = await supabase
-            .from('manga_chapters')
-            .select('chapter')
-            .eq('judul', judul)
-            .order('chapter', { ascending: false });
+        document.title = judul + " - SUKA BACA";
+        document.getElementById('searchInput').style.display = 'none'; // Sembunyikan search bar
 
         const container = document.getElementById('chapter-list');
-        container.innerHTML = "";
+        container.innerHTML = "<div class='loading'><div class='spinner'></div>Memuat chapter...</div>";
 
-        data.forEach(row => {
-            const btn = document.createElement('div');
-            btn.className = 'btn-chapter';
-            btn.innerText = "Ch. " + row.chapter;
-            btn.onclick = () => startReading(row.chapter);
-            container.appendChild(btn);
-        });
+        try {
+            const { data, error } = await supabase
+                .from('manga_chapters')
+                .select('chapter')
+                .eq('judul', judul)
+                .order('chapter', { ascending: false });
+
+            if (error) throw error;
+
+            container.innerHTML = "";
+            availableChapters = data.map(row => row.chapter);
+
+            if (availableChapters.length === 0) {
+                container.innerHTML = "<div class='loading'>Belum ada chapter tersedia.</div>";
+                return;
+            }
+
+            data.forEach(row => {
+                const btn = document.createElement('div');
+                btn.className = 'btn-chapter';
+                btn.innerText = "Chapter " + row.chapter;
+                btn.onclick = () => startReading(row.chapter);
+                container.appendChild(btn);
+            });
+        } catch (err) {
+            container.innerHTML = `<div class="error-msg">Gagal memuat chapter: ${err.message}</div>`;
+        }
     }
 
     async function startReading(ch) {
         switchView('view-reader');
+        scrollToTop();
+        document.title = currentManga + " Ch." + ch + " - SUKA BACA";
+        currentReadingChapter = ch;
 
-        const { data } = await supabase
-            .from('manga_chapters')
-            .select('daftar_gambar')
-            .eq('judul', currentManga)
-            .eq('chapter', ch)
-            .single();
-
-        let images = data.daftar_gambar;
-        if (typeof images === "string") images = JSON.parse(images);
+        // Simpan Riwayat Baca
+        localStorage.setItem('sukaBaca_history', JSON.stringify({ judul: currentManga, chapter: ch }));
 
         const area = document.getElementById("reader-area");
-        area.innerHTML = "";
+        area.innerHTML = "<div class='loading'><div class='spinner'></div>Memuat gambar...</div>";
 
-        images.forEach(src => {
-            const img = document.createElement("img");
-            img.className = "lazy-img";
-            img.dataset.src = src;
-            area.appendChild(img);
-            observer.observe(img);
-        });
+        // Logika Tombol Next / Prev
+        const currentIndex = availableChapters.indexOf(ch);
+        // Karena array descending (Ch terbaru di index 0):
+        const chSebelumnya = availableChapters[currentIndex + 1]; // Chapter lebih kecil
+        const chSelanjutnya = availableChapters[currentIndex - 1]; // Chapter lebih besar
+
+        // DROPDOWN CHAPTER NAVIGASI
+        const dropdownOptions = availableChapters.map(c => 
+            `<option value="${c}" ${c == ch ? 'selected' : ''}>Chapter ${c}</option>`
+        ).join('');
+        const dropdownHTML = `<select class="chapter-dropdown" onchange="startReading(this.value)">${dropdownOptions}</select>`;
+
+        const navHTML = `
+            <button class="btn" ${!chSebelumnya ? 'disabled' : `onclick="startReading(${chSebelumnya})"`}>⏮ Prev</button>
+            ${dropdownHTML}
+            <button class="btn" onclick="showDetail(currentManga)">🔙 List</button>
+            <button class="btn" ${!chSelanjutnya ? 'disabled' : `onclick="startReading(${chSelanjutnya})"`}>Next ⏭</button>
+        `;
+        
+        document.getElementById('top-reader-nav').innerHTML = navHTML;
+        document.getElementById('bottom-reader-nav').innerHTML = navHTML;
+
+        try {
+            const { data, error } = await supabase
+                .from('manga_chapters')
+                .select('daftar_gambar')
+                .eq('judul', currentManga)
+                .eq('chapter', ch)
+                .single();
+
+            if (error) throw error;
+
+            let images = data.daftar_gambar;
+            if (typeof images === "string") {
+                images = JSON.parse(images);
+            }
+
+            area.innerHTML = "";
+            images.forEach(src => {
+                const img = document.createElement("img");
+                img.className = "lazy-img";
+                img.dataset.src = src;
+                img.onerror = function() { 
+                    this.src = 'https://via.placeholder.com/600x800?text=Gambar+Gagal+Dimuat'; 
+                    this.classList.add('loaded'); 
+                };
+                area.appendChild(img);
+                observer.observe(img);
+            });
+
+        } catch (err) {
+            area.innerHTML = `<div class="error-msg">Gagal memuat isi chapter: ${err.message}</div>`;
+        }
+
+        // Muat Komentar
+        loadComments(currentManga, ch);
+        renderCommentForm();
+    }
+
+    // SISTEM KOMENTAR
+    async function loadComments(judul, chapter) {
+        const list = document.getElementById('comment-list');
+        const count = document.getElementById('comment-count');
+        list.innerHTML = "<div class='loading'><div class='spinner'></div>Memuat komentar...</div>";
+        
+        try {
+            const { data, error } = await supabase
+                .from('manga_comments')
+                .select('*')
+                .eq('judul', judul)
+                .eq('chapter', chapter)
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+
+            count.innerText = data.length;
+            if (data.length === 0) {
+                list.innerHTML = "<div class='loading' style='padding:20px'>Belum ada komentar. Jadilah yang pertama!</div>";
+            } else {
+                list.innerHTML = "";
+                data.forEach(c => {
+                    let div = document.createElement('div');
+                    div.className = 'comment-item';
+                    let userName = c.user_email ? c.user_email.split('@')[0] : "Anonim";
+                    div.innerHTML = `
+                        <div class="comment-user">
+                            <span>👤 ${userName}</span>
+                            <span class="comment-date">${new Date(c.created_at).toLocaleDateString('id-ID')}</span>
+                        </div>
+                        <div class="comment-text">${c.komentar}</div>
+                    `;
+                    list.appendChild(div);
+                });
+            }
+        } catch (err) {
+            list.innerHTML = `<div class="error-msg" style="font-size:12px;">Data komentar belum tersedia. (Error: ${err.message})</div>`;
+        }
+    }
+
+    function renderCommentForm() {
+        const action = document.getElementById('comment-action');
+        if (currentUser) {
+            action.innerHTML = `
+                <div class="comment-form">
+                    <textarea id="new-comment" class="comment-input" rows="3" placeholder="Tulis komentarmu di sini..."></textarea>
+                    <button class="btn" style="width: 150px; align-self: flex-end;" onclick="submitComment()">Kirim</button>
+                </div>
+            `;
+        } else {
+            action.innerHTML = `
+                <div class="login-prompt">
+                    <p style="margin-top:0;">Kamu harus login untuk ikut berdiskusi.</p>
+                    <button class="btn" style="width:200px;" onclick="handleAuth()">Login / Daftar</button>
+                </div>
+            `;
+        }
+    }
+
+    async function submitComment() {
+        if (!currentUser) return;
+        const text = document.getElementById('new-comment').value.trim();
+        if (!text) return alert("Komentar tidak boleh kosong!");
+
+        const btn = document.querySelector('.comment-form .btn');
+        btn.innerText = "Mengirim..."; btn.disabled = true;
+
+        const { error } = await supabase.from('manga_comments').insert([{
+            judul: currentManga, chapter: currentReadingChapter,
+            user_email: currentUser.email, komentar: text
+        }]);
+
+        if (error) {
+            alert("Gagal kirim. Pastikan table Supabase sudah disiapkan!");
+        } else {
+            document.getElementById('new-comment').value = '';
+            loadComments(currentManga, currentReadingChapter);
+        }
+        btn.innerText = "Kirim"; btn.disabled = false;
     }
 
     function switchView(id) {
         document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
         document.getElementById(id).classList.add('active');
-        window.scrollTo(0,0);
+        document.getElementById('read-progress').style.display = (id === 'view-reader') ? 'block' : 'none';
     }
 
     function showHome() {
         switchView('view-home');
-        document.getElementById('reader-area').innerHTML = '';
+        document.title = "SUKA BACA Manga - Premium";
+        document.getElementById('searchInput').style.display = 'block'; // Tampilkan search bar
+        document.getElementById('reader-area').innerHTML = ''; // Bersihkan memori gambar
+        document.getElementById('searchInput').value = ''; // Reset pencarian
+        renderMangaList(allMangaData);
+        loadHistory();
     }
 
+    // Jalankan pertama kali
+    checkUser();
     loadHome();
 </script>
 
