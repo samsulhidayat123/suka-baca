@@ -610,36 +610,75 @@
         try {
             document.getElementById('manga-list').innerHTML = "<div class='loading'><div class='spinner'></div>Memuat daftar manga...</div>";
             loadHistory();
-            
-            const { data, error } = await supabase
-                .from('manga_chapters')
-                .select('judul, daftar_gambar, created_at')
-                .order('created_at', { ascending: false })
-                .range(0, 5000);
-            if (error) throw error;
 
-            // Ambil judul unik saja
-            const unique = [...new Set(data.map(x => x.judul))];
-            
-            allMangaData = unique.map(judul => {
-                const item = data.find(x => x.judul === judul);
-                let img = "https://via.placeholder.com/300x450?text=No+Cover";
-                if (item.daftar_gambar) {
-                    let imgs = item.daftar_gambar;
-                    if (typeof imgs === "string") {
-                        try { imgs = JSON.parse(imgs); } catch(e) {}
+            let semuaData = [];
+            let from = 0;
+            let limit = 1000;
+            let selesai = false;
+
+            while (!selesai) {
+                const { data, error } = await supabase
+                    .from('manga_chapters')
+                    .select('judul, daftar_gambar, created_at')
+                    .order('created_at', { ascending: false })
+                    .range(from, from + limit - 1);
+
+                if (error) throw error;
+
+                if (!data || data.length === 0) {
+                    selesai = true;
+                } else {
+                    semuaData = semuaData.concat(data);
+
+                    if (data.length < limit) {
+                        selesai = true;
+                    } else {
+                        from += limit;
                     }
-                    if(imgs && imgs.length > 0) img = imgs[0];
                 }
-                return { judul, img };
+            }
+
+            const judulMap = new Map();
+
+            semuaData.forEach(item => {
+                if (!item.judul || item.judul.trim() === "") return;
+
+                if (!judulMap.has(item.judul)) {
+                    let img = "https://via.placeholder.com/300x450?text=No+Cover";
+
+                    if (item.daftar_gambar) {
+                        let imgs = item.daftar_gambar;
+
+                        if (typeof imgs === "string") {
+                            try {
+                                imgs = JSON.parse(imgs);
+                            } catch(e) {}
+                        }
+
+                        if (imgs && imgs.length > 0) {
+                            img = imgs[0];
+                        }
+                    }
+
+                    judulMap.set(item.judul, {
+                        judul: item.judul,
+                        img: img
+                    });
+                }
             });
 
+            allMangaData = Array.from(judulMap.values());
+
             renderMangaList(allMangaData);
+
+            console.log("TOTAL CHAPTER TERBACA:", semuaData.length);
+            console.log("TOTAL MANGA UNIK:", allMangaData.length);
+            console.log("DAFTAR MANGA:", allMangaData.map(m => m.judul));
+
         } catch (err) {
             document.getElementById('manga-list').innerHTML = `<div class="error-msg">Gagal memuat data: ${err.message}</div>`;
         }
     }
-
     function renderMangaList(mangaArray) {
         const container = document.getElementById('manga-list');
         container.innerHTML = "";
