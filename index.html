@@ -160,7 +160,15 @@
         .btn-chapter:hover { background: var(--accent); }
 
         #reader-area { max-width: 800px; margin: auto; background: #000; }
-        #reader-area img { width: 100%; height: auto; display: block; margin-bottom: -1px; }
+        #reader-area img { 
+            width: 100%; 
+            height: auto; 
+            min-height: 800px; /* Tambahkan ini agar gambar punya tinggi kerangka */
+            display: block; 
+            margin-bottom: -1px; 
+            background-color: #111; /* Beri warna dasar saat gambar belum muncul */
+        }
+        body.light-mode #reader-area img { background-color: #eee; }
 
         .reader-nav {
             display: flex;
@@ -195,6 +203,13 @@
 
         @media (max-width: 600px) {
             .btn, .chapter-dropdown { flex: 1 1 45%; box-sizing: border-box; }
+            
+            /* Penyesuaian agar bar pencarian dan menu muat di layar HP tanpa bertabrakan */
+            .brand { font-size: 18px; }
+            .nav-right { gap: 5px; }
+            .search-bar { width: 130px; padding: 6px 12px; font-size: 16px; } /* font-size 16px mencegah auto-zoom di iOS */
+            .theme-toggle { font-size: 16px; }
+            .btn-auth { padding: 6px 10px; font-size: 14px; }
         }
 
         /* SAWERIA & KOMENTAR */
@@ -221,7 +236,7 @@
         .login-prompt { text-align: center; padding: 20px; background: #222; border-radius: 8px; margin-top: 20px; }
         body.light-mode .login-prompt { background: #eee; }
 
-        .lazy-img { opacity: 0; transition: 0.6s; }
+        .lazy-img { opacity: 0; transition: 0.2s ease-in; }
         .lazy-img.loaded { opacity: 1; }
 
         .loading { padding: 50px; text-align: center; color: var(--text-muted); font-size: 1.2rem; }
@@ -393,6 +408,18 @@
     var currentReadingChapter = null; // Menyimpan chapter yang sedang dibaca
     var currentUser = null; // Data user yang login
 
+    // FUNGSI KEAMANAN: Mencegah XSS (Cross-Site Scripting)
+    function escapeHTML(str) {
+        if (!str) return '';
+        return String(str).replace(/[&<>'"]/g, tag => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            "'": '&#39;',
+            '"': '&quot;'
+        }[tag]));
+    }
+
     // INISIALISASI TEMA
     if (localStorage.getItem('sukabaca_theme') === 'light') {
         document.body.classList.add('light-mode');
@@ -503,7 +530,7 @@
                 obs.unobserve(img);
             }
         });
-    }, { rootMargin: "0px 0px 800px 0px" });
+    }, { rootMargin: "0px 0px 2500px 0px" });
 
     // SCROLL TO TOP & SMART NAVBAR LOGIC
     let lastScrollTop = 0;
@@ -584,7 +611,11 @@
             document.getElementById('manga-list').innerHTML = "<div class='loading'><div class='spinner'></div>Memuat daftar manga...</div>";
             loadHistory();
             
-            const { data, error } = await supabase.from('manga_chapters').select('judul, daftar_gambar');
+            const { data, error } = await supabase
+                .from('manga_chapters')
+                .select('judul, daftar_gambar, created_at')
+                .order('created_at', { ascending: false })
+                .range(0, 5000);
             if (error) throw error;
 
             // Ambil judul unik saja
@@ -775,9 +806,11 @@
                     div.innerHTML = `
                         <div class="comment-user">
                             <span>👤 ${userName}</span>
+                            <span>👤 ${escapeHTML(userName)}</span>
                             <span class="comment-date">${new Date(c.created_at).toLocaleDateString('id-ID')}</span>
                         </div>
                         <div class="comment-text">${c.komentar}</div>
+                        <div class="comment-text">${escapeHTML(c.komentar)}</div>
                     `;
                     list.appendChild(div);
                 });
@@ -837,11 +870,12 @@
     function showHome() {
         switchView('view-home');
         document.title = "SUKA BACA Manga - Premium";
-        document.getElementById('searchInput').style.display = 'block'; // Tampilkan search bar
-        document.getElementById('reader-area').innerHTML = ''; // Bersihkan memori gambar
-        document.getElementById('searchInput').value = ''; // Reset pencarian
-        renderMangaList(allMangaData);
-        loadHistory();
+        document.getElementById('searchInput').style.display = 'block';
+        document.getElementById('reader-area').innerHTML = '';
+        document.getElementById('searchInput').value = '';
+
+        // Ambil ulang data terbaru dari Supabase
+        loadHome();
     }
 
     // Jalankan pertama kali
