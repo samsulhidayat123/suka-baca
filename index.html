@@ -871,6 +871,7 @@
     async function loadComments(judul, chapter) {
         const list = document.getElementById('comment-list');
         const count = document.getElementById('comment-count');
+
         list.innerHTML = "<div class='loading'><div class='spinner'></div>Memuat komentar...</div>";
         
         try {
@@ -878,43 +879,58 @@
                 .from('manga_comments')
                 .select('*')
                 .eq('judul', judul)
-                .eq('chapter', chapter)
+                .eq('chapter', String(chapter))
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
 
             count.innerText = data.length;
+
             if (data.length === 0) {
                 list.innerHTML = "<div class='loading' style='padding:20px'>Belum ada komentar. Jadilah yang pertama!</div>";
-            } else {
-                list.innerHTML = "";
-                data.forEach(c => {
-                    let div = document.createElement('div');
-                    div.className = 'comment-item';
-                    let userName = c.user_email ? c.user_email.split('@')[0] : "Anonim";
-                    div.innerHTML = `
-                        <div class="comment-user">
-                            <span>👤 ${userName}</span>
-                            <span>👤 ${escapeHTML(userName)}</span>
-                            <span class="comment-date">${new Date(c.created_at).toLocaleDateString('id-ID')}</span>
-                        </div>
-                        <div class="comment-text">${c.komentar}</div>
-                        <div class="comment-text">${escapeHTML(c.komentar)}</div>
-                    `;
-                    list.appendChild(div);
-                });
+                return;
             }
+
+            list.innerHTML = "";
+
+            data.forEach(c => {
+                const div = document.createElement('div');
+                div.className = 'comment-item';
+
+                const userName = c.user_email ? c.user_email.split('@')[0] : "Anonim";
+                const tanggal = c.created_at
+                    ? new Date(c.created_at).toLocaleDateString('id-ID')
+                    : "";
+
+                div.innerHTML = `
+                    <div class="comment-user">
+                        <span>👤 ${escapeHTML(userName)}</span>
+                        <span class="comment-date">${tanggal}</span>
+                    </div>
+                    <div class="comment-text">${escapeHTML(c.komentar)}</div>
+                `;
+
+                list.appendChild(div);
+            });
+
         } catch (err) {
-            list.innerHTML = `<div class="error-msg" style="font-size:12px;">Data komentar belum tersedia. (Error: ${err.message})</div>`;
+            console.error("Gagal memuat komentar:", err);
+            list.innerHTML = `<div class="error-msg" style="font-size:12px;">Gagal memuat komentar: ${err.message}</div>`;
         }
     }
 
     function renderCommentForm() {
         const action = document.getElementById('comment-action');
+
         if (currentUser) {
+            const namaUser = currentUser.email ? currentUser.email.split('@')[0] : "User";
+
             action.innerHTML = `
                 <div class="comment-form">
-                    <textarea id="new-comment" class="comment-input" rows="3" placeholder="Tulis komentarmu di sini..."></textarea>
+                    <p style="margin:0; font-size:13px; color:var(--text-muted);">
+                        Login sebagai <b>${escapeHTML(namaUser)}</b>
+                    </p>
+                    <textarea id="new-comment" class="comment-input" rows="3" maxlength="500" placeholder="Tulis komentarmu di sini..."></textarea>
                     <button class="btn" style="width: 150px; align-self: flex-end;" onclick="submitComment()">Kirim</button>
                 </div>
             `;
@@ -929,27 +945,46 @@
     }
 
     async function submitComment() {
-        if (!currentUser) return;
-        const text = document.getElementById('new-comment').value.trim();
-        if (!text) return alert("Komentar tidak boleh kosong!");
+        if (!currentUser) {
+            alert("Kamu harus login dulu untuk berkomentar.");
+            openAuthModal();
+            return;
+        }
+
+        const input = document.getElementById('new-comment');
+        const text = input.value.trim();
+
+        if (!text) {
+            alert("Komentar tidak boleh kosong!");
+            return;
+        }
+
+        if (text.length > 500) {
+            alert("Komentar maksimal 500 karakter.");
+            return;
+        }
 
         const btn = document.querySelector('.comment-form .btn');
-        btn.innerText = "Mengirim..."; btn.disabled = true;
+        btn.innerText = "Mengirim...";
+        btn.disabled = true;
 
         const { error } = await supabase.from('manga_comments').insert([{
-            judul: currentManga, chapter: currentReadingChapter,
-            user_email: currentUser.email, komentar: text
+            judul: currentManga,
+            chapter: String(currentReadingChapter),
+            komentar: text
         }]);
 
         if (error) {
-            alert("Gagal kirim. Pastikan table Supabase sudah disiapkan!");
+            console.error("Gagal kirim komentar:", error);
+            alert("Gagal kirim komentar. Pastikan kamu sudah login.");
         } else {
-            document.getElementById('new-comment').value = '';
-            loadComments(currentManga, currentReadingChapter);
+            input.value = '';
+            await loadComments(currentManga, currentReadingChapter);
         }
-        btn.innerText = "Kirim"; btn.disabled = false;
-    }
 
+        btn.innerText = "Kirim";
+        btn.disabled = false;
+    }
     function switchView(id) {
         document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
         document.getElementById(id).classList.add('active');
