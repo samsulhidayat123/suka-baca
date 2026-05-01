@@ -712,35 +712,83 @@
         switchView('view-detail');
         document.getElementById('detail-title').innerText = judul;
         document.title = judul + " - SUKA BACA";
-        document.getElementById('searchInput').style.display = 'none'; // Sembunyikan search bar
+        document.getElementById('searchInput').style.display = 'none';
 
         const container = document.getElementById('chapter-list');
         container.innerHTML = "<div class='loading'><div class='spinner'></div>Memuat chapter...</div>";
 
         try {
-            const { data, error } = await supabase
-                .from('manga_chapters')
-                .select('chapter')
-                .eq('judul', judul)
-                .order('chapter', { ascending: false });
+            let semuaChapter = [];
+            let from = 0;
+            let limit = 1000;
+            let selesai = false;
 
-            if (error) throw error;
+            while (!selesai) {
+                const { data, error } = await supabase
+                    .from('manga_chapters')
+                    .select('chapter, created_at')
+                    .eq('judul', judul)
+                    .range(from, from + limit - 1);
+
+                if (error) throw error;
+
+                if (!data || data.length === 0) {
+                    selesai = true;
+                } else {
+                    semuaChapter = semuaChapter.concat(data);
+
+                    if (data.length < limit) {
+                        selesai = true;
+                    } else {
+                        from += limit;
+                    }
+                }
+            }
+
+            function angkaChapter(chapter) {
+                const match = String(chapter).match(/\d+(\.\d+)?/);
+                return match ? parseFloat(match[0]) : 0;
+            }
+
+            // Hapus duplicate chapter
+            const chapterMap = new Map();
+
+            semuaChapter.forEach(row => {
+                if (row.chapter === null || row.chapter === undefined) return;
+
+                const chapterNormal = String(row.chapter).trim();
+
+                if (!chapterMap.has(chapterNormal)) {
+                    chapterMap.set(chapterNormal, {
+                        chapter: chapterNormal,
+                        created_at: row.created_at
+                    });
+                }
+            });
+
+            const chapterUnik = Array.from(chapterMap.values())
+                .sort((a, b) => angkaChapter(b.chapter) - angkaChapter(a.chapter));
 
             container.innerHTML = "";
-            availableChapters = data.map(row => row.chapter);
+            availableChapters = chapterUnik.map(row => row.chapter);
 
             if (availableChapters.length === 0) {
                 container.innerHTML = "<div class='loading'>Belum ada chapter tersedia.</div>";
                 return;
             }
 
-            data.forEach(row => {
+            chapterUnik.forEach(row => {
                 const btn = document.createElement('div');
                 btn.className = 'btn-chapter';
                 btn.innerText = "Chapter " + row.chapter;
                 btn.onclick = () => startReading(row.chapter);
                 container.appendChild(btn);
             });
+
+            console.log("TOTAL ROW CHAPTER:", semuaChapter.length);
+            console.log("TOTAL CHAPTER UNIK:", chapterUnik.length);
+            console.log("CHAPTER TERATAS:", availableChapters.slice(0, 20));
+
         } catch (err) {
             container.innerHTML = `<div class="error-msg">Gagal memuat chapter: ${err.message}</div>`;
         }
@@ -786,6 +834,8 @@
                 .select('daftar_gambar')
                 .eq('judul', currentManga)
                 .eq('chapter', ch)
+                .order('created_at', { ascending: false })
+                .limit(1)
                 .single();
 
             if (error) throw error;
