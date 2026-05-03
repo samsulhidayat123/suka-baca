@@ -37,6 +37,7 @@
         }
         body.light-mode .manga-card { background: #fff; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         body.light-mode .search-bar { background: #ddd; color: #141414; }
+        body.light-mode .search-bar:focus { background: #eee; box-shadow: 0 4px 15px rgba(229, 9, 20, 0.2); }
         body.light-mode #reader-area { background: #fff; }
         body.light-mode .btn-chapter { background: #ddd; color: #141414; }
 
@@ -62,7 +63,7 @@
             transition: top 0.3s ease-in-out;
         }
 
-        .brand { font-weight: 800; font-size: 26px; color: var(--accent); cursor: pointer; margin: 0; }
+        .brand { font-weight: 800; font-size: 32px; color: var(--accent); cursor: pointer; margin: 0; transition: font-size 0.3s; }
         .brand span { color: white; }
         body.light-mode .brand span { color: #141414; }
 
@@ -71,14 +72,29 @@
         .btn-auth { background: var(--accent); color: white; padding: 6px 15px; border-radius: 20px; border: none; cursor: pointer; font-weight: 600; font-family: inherit; }
         .btn-auth:hover { opacity: 0.8; }
 
+        .search-container {
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: center;
+        }
         .search-bar {
-            padding: 8px 15px;
-            border-radius: 20px;
+            padding: 12px 20px;
+            border-radius: 25px;
             border: none;
             outline: none;
             background: #333;
             color: white;
             font-family: inherit;
+            width: 100%;
+            max-width: 350px;
+            transition: max-width 0.4s ease, background 0.3s ease, box-shadow 0.3s ease;
+            font-size: 16px;
+        }
+        
+        .search-bar:focus {
+            max-width: 650px;
+            background: #444;
+            box-shadow: 0 4px 15px rgba(229, 9, 20, 0.3);
         }
 
         /* READING PROGRESS BAR */
@@ -104,6 +120,14 @@
         }
 
         .container { padding: 40px 5%; }
+
+        /* KATEGORI FILTER */
+        .category-filter { display: flex; gap: 10px; margin-bottom: 25px; flex-wrap: wrap; }
+        .cat-btn { background: #222; color: white; border: none; padding: 8px 18px; border-radius: 20px; cursor: pointer; transition: 0.3s; font-weight: 600; font-family: inherit; }
+        .cat-btn:hover { background: #444; }
+        .cat-btn.active { background: var(--accent); }
+        body.light-mode .cat-btn { background: #ddd; color: black; }
+        body.light-mode .cat-btn.active { background: var(--accent); color: white; }
 
         /* HISTORY BANNER */
         .history-banner { background: linear-gradient(45deg, var(--accent), #8b0000); padding: 15px 20px; border-radius: 8px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; transition: transform 0.3s; }
@@ -205,9 +229,8 @@
             .btn, .chapter-dropdown { flex: 1 1 45%; box-sizing: border-box; }
             
             /* Penyesuaian agar bar pencarian dan menu muat di layar HP tanpa bertabrakan */
-            .brand { font-size: 18px; }
+            .brand { font-size: 22px; }
             .nav-right { gap: 5px; }
-            .search-bar { width: 130px; padding: 6px 12px; font-size: 16px; } /* font-size 16px mencegah auto-zoom di iOS */
             .theme-toggle { font-size: 16px; }
             .btn-auth { padding: 6px 10px; font-size: 14px; }
         }
@@ -322,7 +345,6 @@
 <nav class="navbar">
     <h1 class="brand" onclick="showHome()">SUKA<span>BACA</span></h1>
     <div class="nav-right">
-        <input type="text" id="searchInput" class="search-bar" placeholder="Cari manga..." onkeyup="filterManga()">
         <button class="theme-toggle" onclick="toggleTheme()" title="Ganti Tema">🌙</button>
         <button id="btnAuth" class="btn-auth" onclick="handleAuth()">Login</button>
     </div>
@@ -336,7 +358,16 @@
     </header>
 
     <div class="container">
+        <div class="search-container">
+            <input type="text" id="searchInput" class="search-bar" placeholder="Cari judul manga/manhwa..." onkeyup="filterManga()">
+        </div>
         <div id="history-container"></div>
+        <div class="category-filter" id="category-filter">
+            <button class="cat-btn active" onclick="filterCategory('Semua', this)">Semua</button>
+            <button class="cat-btn" onclick="filterCategory('Manga', this)">Manga</button>
+            <button class="cat-btn" onclick="filterCategory('Manhwa', this)">Manhwa</button>
+            <button class="cat-btn" onclick="filterCategory('Buku', this)">Buku</button>
+        </div>
         <div id="manga-list" class="manga-grid">
             <div class="loading">Memuat daftar manga...</div>
         </div>
@@ -407,6 +438,7 @@
     var allMangaData = []; // Untuk fitur search
     var currentReadingChapter = null; // Menyimpan chapter yang sedang dibaca
     var currentUser = null; // Data user yang login
+    var currentCategory = 'Semua'; // Kategori yang sedang dipilih
 
     // FUNGSI KEAMANAN: Mencegah XSS (Cross-Site Scripting)
     function escapeHTML(str) {
@@ -606,7 +638,7 @@
         startReading(chapter);
     }
 
-    async function loadHome() {
+    async function loadHome(kategoriFilter = 'Semua') {
         try {
             document.getElementById('manga-list').innerHTML = "<div class='loading'><div class='spinner'></div>Memuat daftar manga...</div>";
             loadHistory();
@@ -617,11 +649,44 @@
             let selesai = false;
 
             while (!selesai) {
-                const { data, error } = await supabase
+                let query = supabase
                     .from('manga_chapters')
-                    .select('judul, daftar_gambar, created_at')
+                    .select('judul, daftar_gambar, created_at, kategori')
                     .order('created_at', { ascending: false })
                     .range(from, from + limit - 1);
+                    
+                // TAMBAHKAN FILTER DATABASE BERDASARKAN KATEGORI
+                if (kategoriFilter !== 'Semua') {
+                    if (kategoriFilter === 'Manga') {
+                        query = query.or('kategori.ilike.Manga,kategori.is.null'); // Fallback data lama
+                        query = query.not('judul', 'ilike', '%Wind Breaker%')
+                                     .not('judul', 'ilike', '%Manager Kim%')
+                                     .not('judul', 'ilike', '%Lookism%')
+                                     .not('judul', 'ilike', '%Killer Peter%');
+                    } else if (kategoriFilter === 'Manhwa') {
+                        // PENTING: Di dalam string .or(), wildcard harus menggunakan bintang (*) bukan persen (%)
+                        query = query.or('kategori.ilike.Manhwa,judul.ilike.*Wind Breaker*,judul.ilike.*Manager Kim*,judul.ilike.*Lookism*,judul.ilike.*Killer Peter*');
+                    } else {
+                        query = query.ilike('kategori', kategoriFilter); // ilike agar bebas huruf besar/kecil
+                    }
+                }
+
+                let { data, error } = await query;
+
+                // Fallback jika kolom 'kategori' belum dibuat di Supabase
+                if (error && error.message.includes('kategori')) {
+                    console.warn("Peringatan: Kolom 'kategori' belum ada di database. Mengambil data tanpa kategori.");
+                    
+                    let fallbackQuery = supabase
+                        .from('manga_chapters')
+                        .select('judul, daftar_gambar, created_at')
+                        .order('created_at', { ascending: false })
+                        .range(from, from + limit - 1);
+
+                    const fallbackRes = await fallbackQuery;
+                    data = fallbackRes.data;
+                    error = fallbackRes.error;
+                }
 
                 if (error) throw error;
 
@@ -660,16 +725,27 @@
                         }
                     }
 
+                    let kategoriOtomatis = item.kategori;
+                    if (!kategoriOtomatis) {
+                        const jdl = item.judul.toLowerCase();
+                        if (jdl.includes('wind breaker') || jdl.includes('manager kim') || jdl.includes('lookism') || jdl.includes('killer peter')) {
+                            kategoriOtomatis = 'Manhwa';
+                        } else {
+                            kategoriOtomatis = 'Manga'; // Default ke Manga jika kosong
+                        }
+                    }
+
                     judulMap.set(item.judul, {
                         judul: item.judul,
-                        img: img
+                        img: img,
+                        kategori: kategoriOtomatis
                     });
                 }
             });
 
             allMangaData = Array.from(judulMap.values());
 
-            renderMangaList(allMangaData);
+            applyFilters(); // Terapkan filter di awal render
 
             console.log("TOTAL CHAPTER TERBACA:", semuaData.length);
             console.log("TOTAL MANGA UNIK:", allMangaData.length);
@@ -701,7 +777,25 @@
         });
     }
 
+    function filterCategory(cat, btnElement) {
+        currentCategory = cat;
+        
+        // Update tombol yang aktif
+        if (btnElement) {
+            document.querySelectorAll('.cat-btn').forEach(btn => btn.classList.remove('active'));
+            btnElement.classList.add('active');
+        }
+        
+        // Panggil database lagi dan hanya ambil data sesuai kategori
+        loadHome(cat);
+    }
+
     function filterManga() {
+        applyFilters();
+    }
+
+    function applyFilters() {
+        // Karena data dari DB sudah terfilter kategorinya, di sini cukup filter pencarian (search)
         const query = document.getElementById('searchInput').value.toLowerCase();
         const filtered = allMangaData.filter(m => m.judul.toLowerCase().includes(query));
         renderMangaList(filtered);
@@ -712,7 +806,6 @@
         switchView('view-detail');
         document.getElementById('detail-title').innerText = judul;
         document.title = judul + " - SUKA BACA";
-        document.getElementById('searchInput').style.display = 'none';
 
         const container = document.getElementById('chapter-list');
         container.innerHTML = "<div class='loading'><div class='spinner'></div>Memuat chapter...</div>";
@@ -994,12 +1087,16 @@
     function showHome() {
         switchView('view-home');
         document.title = "SUKA BACA Manga - Premium";
-        document.getElementById('searchInput').style.display = 'block';
         document.getElementById('reader-area').innerHTML = '';
         document.getElementById('searchInput').value = '';
 
+        // Reset tombol kategori ke "Semua"
+        document.querySelectorAll('.cat-btn').forEach(btn => btn.classList.remove('active'));
+        document.querySelector('.cat-btn').classList.add('active');
+        currentCategory = 'Semua';
+
         // Ambil ulang data terbaru dari Supabase
-        loadHome();
+        loadHome('Semua');
     }
 
     // Jalankan pertama kali
