@@ -259,6 +259,19 @@
         .login-prompt { text-align: center; padding: 20px; background: #222; border-radius: 8px; margin-top: 20px; }
         body.light-mode .login-prompt { background: #eee; }
 
+        /* REAKSI / EMOTICON */
+        .reaction-section { text-align: center; margin-bottom: 25px; border-bottom: 1px solid #333; padding-bottom: 20px; }
+        body.light-mode .reaction-section { border-bottom: 1px solid #ddd; }
+        .reaction-title { margin-top: 0; margin-bottom: 15px; font-size: 16px; }
+        .reaction-container { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
+        .reaction-btn { background: #222; border: 1px solid #333; border-radius: 20px; padding: 6px 15px; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: 0.2s; color: white; font-family: inherit; font-size: 14px; }
+        body.light-mode .reaction-btn { background: #eee; border: 1px solid #ddd; color: black; }
+        .reaction-btn:hover { transform: translateY(-3px); border-color: var(--accent); }
+        .reaction-btn.active { background: var(--accent); border-color: var(--accent); color: white; }
+        body.light-mode .reaction-btn.active { background: var(--accent); border-color: var(--accent); color: white; }
+        .reaction-emoji { font-size: 20px; }
+        .reaction-count { font-weight: bold; }
+
         .lazy-img { opacity: 0; transition: 0.2s ease-in; }
         .lazy-img.loaded { opacity: 1; }
 
@@ -401,6 +414,12 @@
     </div>
 
     <div class="comment-section" id="comment-section">
+        <div class="reaction-section">
+            <h3 class="reaction-title">Bagaimana pendapatmu tentang chapter ini?</h3>
+            <div class="reaction-container" id="reaction-container">
+                <!-- Tombol reaksi akan dimuat di sini -->
+            </div>
+        </div>
         <h3>💬 Komentar (<span id="comment-count">0</span>)</h3>
         <div id="comment-list">
             <div class="loading">Memuat komentar...</div>
@@ -439,6 +458,15 @@
     var currentReadingChapter = null; // Menyimpan chapter yang sedang dibaca
     var currentUser = null; // Data user yang login
     var currentCategory = 'Semua'; // Kategori yang sedang dipilih
+
+    // DATA EMOJI REAKSI (Skala 1 - 5)
+    const EMOJIS = [
+        { id: 1, emoji: '😡' }, // 1. Marah
+        { id: 2, emoji: '😞' }, // 2. Sedih
+        { id: 3, emoji: '😐' }, // 3. Biasa
+        { id: 4, emoji: '🙂' }, // 4. Suka
+        { id: 5, emoji: '😍' }  // 5. Sangat Suka
+    ];
 
     // FUNGSI KEAMANAN: Mencegah XSS (Cross-Site Scripting)
     function escapeHTML(str) {
@@ -956,8 +984,71 @@
         }
 
         // Muat Komentar
+        loadReactions(currentManga, ch); // Panggil fungsi reaksi
         loadComments(currentManga, ch);
         renderCommentForm();
+    }
+
+    // SISTEM REAKSI EMOJI
+    async function loadReactions(judul, chapter) {
+        const container = document.getElementById('reaction-container');
+        container.innerHTML = '<div class="spinner" style="width:25px;height:25px;margin:0 auto;border-width:3px;"></div>';
+
+        try {
+            const { data, error } = await supabase
+                .from('manga_reactions')
+                .select('reaction_id')
+                .eq('judul', judul)
+                .eq('chapter', String(chapter));
+
+            let counts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+            if (data && !error) {
+                data.forEach(r => { counts[r.reaction_id] = (counts[r.reaction_id] || 0) + 1; });
+            }
+            renderReactions(counts);
+        } catch (err) {
+            console.error("Gagal load reaksi:", err);
+            renderReactions({ 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }); // Fallback jika tabel belum ada
+        }
+    }
+
+    function renderReactions(counts) {
+        const container = document.getElementById('reaction-container');
+        container.innerHTML = '';
+        const userReactKey = `react_${currentManga}_${currentReadingChapter}`;
+        const userVoted = localStorage.getItem(userReactKey);
+
+        EMOJIS.forEach(item => {
+            const btn = document.createElement('button');
+            btn.className = `reaction-btn ${userVoted == item.id ? 'active' : ''}`;
+            btn.innerHTML = `<span class="reaction-emoji">${item.emoji}</span> <span class="reaction-count">${counts[item.id] || 0}</span>`;
+            btn.onclick = () => submitReaction(item.id);
+            container.appendChild(btn);
+        });
+    }
+
+    async function submitReaction(reactionId) {
+        const userReactKey = `react_${currentManga}_${currentReadingChapter}`;
+        if (localStorage.getItem(userReactKey)) {
+            alert("Terima kasih, tapi kamu sudah memberikan reaksi untuk chapter ini! 😄");
+            return;
+        }
+
+        // Optimistic UI update (Langsung ganti angka di layar agar terasa instan)
+        localStorage.setItem(userReactKey, reactionId);
+        const buttons = document.querySelectorAll('.reaction-btn');
+        buttons[reactionId - 1].classList.add('active');
+        const countSpan = buttons[reactionId - 1].querySelector('.reaction-count');
+        countSpan.innerText = parseInt(countSpan.innerText) + 1;
+
+        // Kirim ke database tanpa perlu menunggu (await) untuk UX yang lebih cepat
+        supabase.from('manga_reactions').insert([{
+            judul: currentManga,
+            chapter: String(currentReadingChapter),
+            reaction_id: reactionId
+        }]).then(({error}) => {
+            if(error) console.error("Gagal kirim reaksi:", error);
+        });
     }
 
     // SISTEM KOMENTAR
