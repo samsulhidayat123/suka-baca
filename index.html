@@ -1004,6 +1004,8 @@
             let counts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
             if (data && !error) {
                 data.forEach(r => { counts[r.reaction_id] = (counts[r.reaction_id] || 0) + 1; });
+            } else if (error) {
+                console.warn("Peringatan: Gagal baca reaksi. Tabel manga_reactions mungkin belum ada.");
             }
             renderReactions(counts);
         } catch (err) {
@@ -1047,7 +1049,10 @@
             chapter: String(currentReadingChapter),
             reaction_id: reactionId
         }]).then(({error}) => {
-            if(error) console.error("Gagal kirim reaksi:", error);
+            if(error) {
+                console.error("Gagal kirim reaksi:", error);
+                alert("Gagal menyimpan reaksi! Pastikan tabel manga_reactions sudah dibuat di Supabase ya bro.");
+            }
         });
     }
 
